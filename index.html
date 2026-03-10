@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CICC-RJ · Sistema de Inteligência Territorial</title>
+<title>LSR CRI MONITORAMENTO</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -682,8 +682,8 @@ body {
 <div id="topbar">
   <div class="logo">
     <div class="status-dot"></div>
-    CICC<span>·RJ</span>
-    <span style="font-size:12px; color:var(--muted); font-weight:400; letter-spacing:1px">INTELIGÊNCIA TERRITORIAL</span>
+    LSR<span>·CRI</span>
+    <span style="font-size:12px; color:var(--muted); font-weight:400; letter-spacing:1px">MONITORAMENTO</span>
   </div>
   <div class="topbar-stats">
     <div class="topbar-stat">
@@ -1645,6 +1645,8 @@ function setOcorrenciasFromSheet(rows) {
   rows.forEach((row, i) => {
     const oc = mapRowFromSheet(row);
     if (!oc) return;
+    oc.data = normalizeDateToPt(oc.data);
+    if (!isTodayOc(oc)) return;
     oc.id = Date.now() + i;
     mapped.push(oc);
   });
@@ -1787,4 +1789,3 @@ setTimeout(() => {
 
 </body>
 </html>
-
