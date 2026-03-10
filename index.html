@@ -939,7 +939,7 @@ body {
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="regions_data.js"></script>
+<script src="./regions_data.js"></script>
 
 <script>
 // ══════════════════════════════════════════
@@ -981,7 +981,7 @@ const SHEETS_CONFIG = {
   sheetId: '', // spreadsheet id
   range: 'Página1!A1:Z',
   // Option B: Published CSV (or local CSV file when served by HTTP)
-  csvUrl: 'alertas_2026_pagina1.csv',
+  csvUrl: './alertas_2026_pagina1.csv',
   refreshMs: 60000,
 };
 
