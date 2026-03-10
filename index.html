@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CICC-RJ · Sistema de Inteligência Territorial</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+:root {
+  --bg:       #080c10;
+  --panel:    #0d1117;
+  --border:   #1a2332;
+  --accent:   #00d4ff;
+  --accent2:  #ff6b35;
+  --green:    #00ff9d;
+  --yellow:   #ffd700;
+  --red:      #ff3333;
+  --purple:   #b44fff;
+  --text:     #c8d6e5;
+  --muted:    #4a5568;
+  --font-ui:  'Rajdhani', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+  --font-body:'IBM Plex Sans', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── TOPBAR ── */
+#topbar {
+  height: 52px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+  z-index: 1000;
+}
+
+#topbar .logo {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#topbar .logo span {
+  color: var(--accent);
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%,100% { opacity:1; }
+  50% { opacity:0.4; }
+}
+
+.topbar-stats {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.topbar-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.topbar-stat .val {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.topbar-stat .lbl {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.topbar-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+  min-width: 120px;
+}
+
+#today-date {
+  font-size: 12px;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+/* ── MAIN LAYOUT ── */
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100vh - 52px);
+}
+
+/* ── LEFT SIDEBAR ── */
+#sidebar {
+  width: 300px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  z-index: 500;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+
+.sidebar-section h3 {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+/* Filters */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.filter-chip:hover { background: rgba(255,255,255,0.04); }
+.filter-chip.active { border-color: currentColor; }
+
+.filter-chip .icon { font-size: 16px; }
+.filter-chip .count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.type-tiroteio    { color: #ff3333; }
+.type-assalto     { color: #ff8c00; }
+.type-operacao    { color: #00d4ff; }
+.type-trafico     { color: #b44fff; }
+.type-homicidio   { color: #ff1493; }
+.type-sequestro   { color: #ffd700; }
+.type-outros      { color: #78909c; }
+
+/* Layer controls */
+.layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toggle-switch {
+  width: 32px; height: 18px;
+  background: var(--border);
+  border-radius: 9px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-switch.on { background: var(--accent); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 12px; height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: left 0.2s;
+}
+.toggle-switch.on::after { left: 17px; }
+
+/* Ocorrências list */
+#ocorrencias-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+#ocorrencias-list::-webkit-scrollbar { width: 4px; }
+#ocorrencias-list::-webkit-scrollbar-track { background: transparent; }
+#ocorrencias-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.oc-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.oc-item:hover { background: rgba(255,255,255,0.03); }
+
+.oc-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.oc-info { flex: 1; min-width: 0; }
+
+.oc-type {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.oc-local {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oc-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ── MAP ── */
+#map {
+  flex: 1;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+}
+
+/* ── RIGHT PANEL ── */
+#detail-panel {
+  width: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  transition: width 0.25s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 500;
+}
+
+#detail-panel.open {
+  width: 320px;
+}
+
+#detail-content {
+  width: 320px;
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+#detail-content h2 {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.detail-tag {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  margin-bottom: 14px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.detail-row .key { color: var(--muted); }
+.detail-row .value { font-weight: 500; text-align: right; max-width: 180px; }
+
+.detail-close {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.detail-close:hover { color: var(--text); }
+
+/* ── MODAL: NEW OCCURRENCE ── */
+#modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+
+#modal-overlay.open { display: flex; }
+
+#modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+#modal h2 {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-group select option { background: #1a2332; }
+.form-group textarea { resize: vertical; min-height: 70px; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.btn {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+.btn-primary:hover { background: #00b8d9; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--text); }
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* ── UPLOAD AREA ── */
+#upload-area {
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#upload-area:hover, #upload-area.dragover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── MAP FAB ── */
+#fab-add {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 900;
+  width: 52px; height: 52px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  font-size: 26px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0,212,255,0.4);
+  transition: all 0.2s;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#fab-add:hover {
+  background: #00b8d9;
+  transform: scale(1.08);
+}
+
+/* ── MAP CONTROLS BAR ── */
+#map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 800;
+  display: flex;
+  gap: 6px;
+}
+
+.map-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+.map-btn:hover, .map-btn.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+/* ── NOTIFICATIONS ── */
+#notif-container {
+  position: fixed;
+  top: 62px;
+  right: 16px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notif {
+  background: var(--panel);
+  border-left: 3px solid var(--accent);
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  min-width: 240px;
+  animation: slideIn 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity:0; }
+  to   { transform: translateX(0);    opacity:1; }
+}
+
+/* ── LEAFLET OVERRIDES ── */
+.leaflet-popup-content-wrapper {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+  color: var(--text) !important;
+}
+
+.leaflet-popup-tip { background: var(--panel) !important; }
+
+.popup-content h4 {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.popup-content .popup-type {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.popup-content .popup-meta {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.leaflet-control-zoom a {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.custom-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  border: 2px solid rgba(255,255,255,0.3);
+  animation: pin-float 3.6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.4));
+}
+
+.custom-pin span {
+  transform: rotate(45deg);
+  font-size: 14px;
+}
+
+@keyframes pin-float {
+  0%, 100% { transform: rotate(-45deg) translateY(0); }
+  50% { transform: rotate(-45deg) translateY(-3px); }
+}
+
+@keyframes pulse-pin {
+  0%,100% { box-shadow: 0 0 20px rgba(0,0,0,0.0); }
+  50% { box-shadow: 0 0 40px rgba(255,255,255,0.25); }
+}
+
+.custom-pin.pin-critical {
+  animation: pin-float 3.6s ease-in-out infinite, pulse-pin 1.5s infinite;
+}
+
+/* HEATMAP-like region hover */
+.leaflet-interactive:hover { cursor: pointer; }
+
+/* ── IMPORT SPREADSHEET MODAL ── */
+#import-info {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.col-mapping {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.col-map-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.col-map-item .col-name {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">
+    <div class="status-dot"></div>
+    CICC<span>·RJ</span>
+    <span style="font-size:12px; color:var(--muted); font-weight:400; letter-spacing:1px">INTELIGÊNCIA TERRITORIAL</span>
+  </div>
+  <div class="topbar-stats">
+    <div class="topbar-stat">
+      <span class="val" id="stat-total">0</span>
+      <span class="lbl">Ocorrências</span>
+    </div>
+    <div class="topbar-stat">
+      <span class="val" id="stat-hoje">0</span>
+      <span class="lbl">Hoje</span>
+    </div>
+    <div class="topbar-stat">
+      <span class="val" id="stat-regioes">1737</span>
+      <span class="lbl">Regiões</span>
+    </div>
+    <div class="topbar-stat">
+      <span class="val" id="stat-cpas">7</span>
+      <span class="lbl">CPAs</span>
+    </div>
+  </div>
+  <div class="topbar-time">
+    <div id="today-date">--/--/----</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- Filters -->
+    <div class="sidebar-section">
+      <h3>Tipo de Ocorrência</h3>
+      <div class="filter-group" id="type-filters">
+        <div class="filter-chip type-tiroteio active" data-type="tiroteio" onclick="toggleFilter(this)">
+          <span class="icon">🔫</span> Tiroteio
+          <span class="count" id="cnt-tiroteio">0</span>
+        </div>
+        <div class="filter-chip type-assalto active" data-type="assalto" onclick="toggleFilter(this)">
+          <span class="icon">🏃</span> Assalto / Roubo
+          <span class="count" id="cnt-assalto">0</span>
+        </div>
+        <div class="filter-chip type-operacao active" data-type="operacao" onclick="toggleFilter(this)">
+          <span class="icon">🚔</span> Operação Policial
+          <span class="count" id="cnt-operacao">0</span>
+        </div>
+        <div class="filter-chip type-trafico active" data-type="trafico" onclick="toggleFilter(this)">
+          <span class="icon">💊</span> Tráfico / Entorpecentes
+          <span class="count" id="cnt-trafico">0</span>
+        </div>
+        <div class="filter-chip type-homicidio active" data-type="homicidio" onclick="toggleFilter(this)">
+          <span class="icon">⚠️</span> Homicídio
+          <span class="count" id="cnt-homicidio">0</span>
+        </div>
+        <div class="filter-chip type-sequestro active" data-type="sequestro" onclick="toggleFilter(this)">
+          <span class="icon">🔒</span> Sequestro / Cárcere
+          <span class="count" id="cnt-sequestro">0</span>
+        </div>
+        <div class="filter-chip type-outros active" data-type="outros" onclick="toggleFilter(this)">
+          <span class="icon">📍</span> Outros
+          <span class="count" id="cnt-outros">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Layers -->
+    <div class="sidebar-section">
+      <h3>Camadas</h3>
+      <div class="layer-toggle" onclick="toggleLayer('regioes', this)">
+        <div class="toggle-switch on" id="toggle-regioes"></div>
+        <span>Regiões KMZ</span>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('pins', this)">
+        <div class="toggle-switch on" id="toggle-pins"></div>
+        <span>Pins de Ocorrências</span>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('heatmap', this)">
+        <div class="toggle-switch" id="toggle-heatmap"></div>
+        <span>Mapa de Calor</span>
+      </div>
+    </div>
+
+    <!-- Import -->
+  <div class="sidebar-section">
+    <h3>Importar Dados</h3>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <button class="btn btn-ghost" style="width:100%; font-size:12px;" onclick="openImportModal()">
+        📊 Importar Planilha CSV/XLSX
+      </button>
+    </div>
+  </div>
+
+    <!-- Occurrences list -->
+    <div class="sidebar-section" style="border-bottom:none; padding-bottom:6px;">
+      <h3>Últimas Ocorrências</h3>
+    </div>
+    <div id="ocorrencias-list">
+      <div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">
+        Nenhuma ocorrência registrada.<br>
+        <span style="font-size:11px;">Use + para adicionar ou importe uma planilha.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP WRAPPER -->
+  <div style="position:relative; flex:1;">
+    <div id="map-controls">
+      <button class="map-btn active" onclick="setView('default')">Rio de Janeiro</button>
+      <button class="map-btn" onclick="setView('norte')">Zona Norte</button>
+      <button class="map-btn" onclick="setView('sul')">Zona Sul</button>
+      <button class="map-btn" onclick="setView('oeste')">Zona Oeste</button>
+    </div>
+    <div id="map"></div>
+    <button id="fab-add" onclick="openOcorrenciaModal()" title="Nova Ocorrência">+</button>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div id="detail-panel">
+    <div id="detail-content">
+      <button class="detail-close" onclick="closeDetail()">×</button>
+      <div id="detail-inner"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- NOTIFICATIONS -->
+<div id="notif-container"></div>
+
+<!-- ── MODAL: NOVA OCORRÊNCIA ── -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <h2>📍 Nova Ocorrência</h2>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo *</label>
+        <select id="f-tipo">
+          <option value="">Selecionar...</option>
+          <option value="tiroteio">🔫 Tiroteio</option>
+          <option value="assalto">🏃 Assalto / Roubo</option>
+          <option value="operacao">🚔 Operação Policial</option>
+          <option value="trafico">💊 Tráfico / Entorpecentes</option>
+          <option value="homicidio">⚠️ Homicídio</option>
+          <option value="sequestro">🔒 Sequestro / Cárcere</option>
+          <option value="outros">📍 Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Gravidade</label>
+        <select id="f-gravidade">
+          <option value="baixa">Baixa</option>
+          <option value="media" selected>Média</option>
+          <option value="alta">Alta</option>
+          <option value="critica">Crítica</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Localidade / Comunidade *</label>
+      <input type="text" id="f-local" placeholder="Ex: Complexo do Alemão, Rocinha...">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Latitude</label>
+        <input type="number" id="f-lat" placeholder="-22.9000" step="any">
+      </div>
+      <div class="form-group">
+        <label>Longitude</label>
+        <input type="number" id="f-lng" placeholder="-43.2000" step="any">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="f-data">
+      </div>
+      <div class="form-group">
+        <label>Hora</label>
+        <input type="time" id="f-hora">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Grupo / Facção (opcional)</label>
+      <input type="text" id="f-grupo" placeholder="Ex: CV, TCP, Milícia...">
+    </div>
+
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="f-descricao" placeholder="Detalhes da ocorrência..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Fonte</label>
+      <input type="text" id="f-fonte" placeholder="Ex: Rádio, CICC, Informante...">
+    </div>
+
+    <p style="font-size:11px; color:var(--muted); margin-top:4px;">
+      💡 Dica: Clique no mapa para definir coordenadas automaticamente.
+    </p>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarOcorrencia()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: IMPORT ── -->
+<div id="import-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:2000; align-items:center; justify-content:center;" onclick="closeImportModal(event)">
+  <div id="import-modal" style="background:var(--panel); border:1px solid var(--border); border-radius:8px; width:500px; padding:24px;">
+    <h2 style="font-family:var(--font-ui); font-size:18px; font-weight:700; margin-bottom:16px; color:var(--accent);">
+      📊 Importar Planilha de Alertas
+    </h2>
+
+    <div id="upload-area" onclick="document.getElementById('file-input').click()"
+         ondragover="this.classList.add('dragover'); event.preventDefault()"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleFileDrop(event)">
+      <div style="font-size:28px; margin-bottom:8px;">📂</div>
+      <strong>Clique ou arraste seu arquivo aqui</strong>
+      <div style="font-size:12px; margin-top:4px;">CSV, XLSX ou TSV</div>
+    </div>
+    <input type="file" id="file-input" accept=".csv,.xlsx,.tsv" style="display:none" onchange="handleFileInput(event)">
+
+    <div id="import-info">
+      <strong style="color:var(--text);">Formato esperado da planilha:</strong>
+      <div class="col-mapping">
+        <div class="col-map-item"><span class="col-name">tipo</span><br>tiroteio, assalto, operacao...</div>
+        <div class="col-map-item"><span class="col-name">local</span><br>Nome da comunidade</div>
+        <div class="col-map-item"><span class="col-name">latitude</span><br>-22.9000</div>
+        <div class="col-map-item"><span class="col-name">longitude</span><br>-43.2000</div>
+        <div class="col-map-item"><span class="col-name">data</span><br>DD/MM/AAAA</div>
+        <div class="col-map-item"><span class="col-name">hora</span><br>HH:MM</div>
+        <div class="col-map-item"><span class="col-name">grupo</span><br>Facção (opcional)</div>
+        <div class="col-map-item"><span class="col-name">descricao</span><br>Texto livre</div>
+      </div>
+      <p style="margin-top:10px; font-size:11px;">
+        ⚠️ Para integração automática com Google Sheets, configure a URL da planilha no painel Supabase.
+      </p>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImportModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="regions_data.js"></script>
+
+<script>
+// ══════════════════════════════════════════
+//  EMBEDDED REGION DATA (from KMZ files)
+//  In production: load from Supabase or a separate JS file
+// ══════════════════════════════════════════
+
+// regions_data.js defines window.REGIONS_DATA
+
+// ══════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════
+const TYPE_CONFIG = {
+  tiroteio:  { icon:'🔫', color:'#ff3333', label:'Tiroteio' },
+  assalto:   { icon:'🏃', color:'#ff8c00', label:'Assalto / Roubo' },
+  operacao:  { icon:'🚔', color:'#00d4ff', label:'Operação Policial' },
+  trafico:   { icon:'💊', color:'#b44fff', label:'Tráfico' },
+  homicidio: { icon:'⚠️', color:'#ff1493', label:'Homicídio' },
+  sequestro: { icon:'🔒', color:'#ffd700', label:'Sequestro' },
+  outros:    { icon:'📍', color:'#78909c', label:'Outros' },
+};
+
+const CPA_COLORS = {
+  '1º CPA': '#ff6b6b',
+  '2º CPA': '#ffd93d',
+  '3º CPA': '#6bcb77',
+  '4º CPA': '#4d96ff',
+  '5º CPA': '#ff922b',
+  '6º CPA': '#cc5de8',
+  '7º CPA': '#20c997',
+};
+
+// ══════════════════════════════════════════
+//  SHEETS / CSV CONFIG
+// ══════════════════════════════════════════
+const SHEETS_CONFIG = {
+  // Option A: Google Sheets API
+  apiKey: '', // set your API key here
+  sheetId: '', // spreadsheet id
+  range: 'Página1!A1:Z',
+  // Option B: Published CSV (or local CSV file when served by HTTP)
+  csvUrl: 'ALERTAS 2026 - Página1.csv',
+  refreshMs: 60000,
+};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let ocorrencias = [];
+let markers = [];
+let regionLayers = [];
+let activeFilters = new Set(['tiroteio','assalto','operacao','trafico','homicidio','sequestro','outros']);
+let layerVisible = { regioes: true, pins: true, heatmap: false };
+let isPickingLocation = false;
+let pickedLat = null, pickedLng = null;
+
+// ══════════════════════════════════════════
+//  MAP INIT
+// ══════════════════════════════════════════
+const map = L.map('map', {
+  center: [-22.9068, -43.1729],
+  zoom: 11,
+  zoomControl: true,
+});
+
+// Dark tile layer
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+// Ensure correct sizing after initial layout
+window.addEventListener('load', () => {
+  setTimeout(() => map.invalidateSize(), 50);
+});
+
+const regionGroup = L.layerGroup().addTo(map);
+const pinGroup    = L.layerGroup().addTo(map);
+
+// ══════════════════════════════════════════
+//  LOAD KMZ REGION DATA
+// ══════════════════════════════════════════
+function initRegions() {
+  if (typeof REGIONS_DATA !== 'undefined' && Array.isArray(REGIONS_DATA) && REGIONS_DATA.length > 0) {
+    renderRegions();
+    showNotif(`✅ ${REGIONS_DATA.length} regiões carregadas dos arquivos KMZ`);
+  } else {
+    loadDemoRegions();
+  }
+}
+
+function loadDemoRegions() {
+  showNotif('ℹ️ Usando dados demo. Coloque regions_data.js na mesma pasta.', 4000);
+  // A few demo polygons for preview
+  REGIONS_DATA = [
+    { name:'ROCINHA', cpa:'1º CPA', bpm:'23º BPM', upp:'2°UPP/23°BPM ROCINHA',
+      coords: [[-22.988,-43.249],[-22.991,-43.245],[-22.994,-43.248],[-22.991,-43.252],[-22.988,-43.249]] },
+    { name:'COMPLEXO DO ALEMÃO', cpa:'1º CPA', bpm:'16º BPM', upp:'',
+      coords: [[-22.852,-43.270],[-22.856,-43.265],[-22.861,-43.268],[-22.857,-43.274],[-22.852,-43.270]] },
+    { name:'JACAREZINHO', cpa:'1º CPA', bpm:'3º BPM', upp:'2ª UPP/3º BPM JACAREZINHO',
+      coords: [[-22.892,-43.265],[-22.895,-43.260],[-22.899,-43.263],[-22.896,-43.268],[-22.892,-43.265]] },
+    { name:'MANGUINHOS', cpa:'1º CPA', bpm:'22º BPM', upp:'2ª UPP/22º BPM MANGUINHOS',
+      coords: [[-22.878,-43.248],[-22.881,-43.243],[-22.885,-43.246],[-22.882,-43.251],[-22.878,-43.248]] },
+  ];
+  renderRegions();
+}
+
+function normalizeCoords(coords) {
+  if (!Array.isArray(coords) || coords.length === 0) return coords;
+  const first = coords[0];
+  if (!Array.isArray(first) || first.length < 2) return coords;
+  const a = Number(first[0]);
+  const b = Number(first[1]);
+  if (Number.isNaN(a) || Number.isNaN(b)) return coords;
+  // Heuristic: Rio has |lat| < |lng|. If swapped, |lat| becomes larger.
+  if (Math.abs(a) > Math.abs(b)) {
+    return coords.map(p => [p[1], p[0]]);
+  }
+  return coords;
+}
+
+function renderRegions() {
+  regionGroup.clearLayers();
+  regionLayers = [];
+
+  REGIONS_DATA.forEach((region) => {
+    const cpa = region.cpa || '';
+    const color = CPA_COLORS[cpa] || '#607d8b';
+
+    const coords = normalizeCoords(region.coords);
+    const poly = L.polygon(coords, {
+      color: color,
+      weight: 1.2,
+      opacity: 0.7,
+      fillColor: color,
+      fillOpacity: 0.12,
+    });
+
+    poly.on('mouseover', function(e) {
+      this.setStyle({ fillOpacity: 0.35, weight: 2.5 });
+      this.bindTooltip(`
+        <div style="font-family:'Rajdhani',sans-serif; line-height:1.4;">
+          <strong style="font-size:14px; color:#fff;">${region.name}</strong><br>
+          <span style="color:#00d4ff;">${region.cpa || ''}</span> · <span style="color:#aaa;">${region.bpm || ''}</span>
+          ${region.upp ? `<br><span style="color:#888; font-size:11px;">${region.upp}</span>` : ''}
+        </div>
+      `, { sticky: true, className: 'dark-tooltip' }).openTooltip(e.latlng);
+    });
+
+    poly.on('mouseout', function() {
+      this.setStyle({ fillOpacity: 0.12, weight: 1.2 });
+      this.unbindTooltip();
+    });
+
+    poly.on('click', function() {
+      showRegionDetail(region);
+    });
+
+    regionLayers.push(poly);
+    if (layerVisible.regioes) regionGroup.addLayer(poly);
+  });
+
+  document.getElementById('stat-regioes').textContent = REGIONS_DATA.length.toLocaleString('pt-BR');
+}
+
+// ══════════════════════════════════════════
+//  OCCURRENCES
+// ══════════════════════════════════════════
+function createPin(oc) {
+  const cfg = TYPE_CONFIG[oc.tipo] || TYPE_CONFIG.outros;
+  const hasCoords = !!(oc.lat && oc.lng);
+  const pos = getOcLatLng(oc);
+  if (!pos) return null;
+  const grav = oc.gravidade || 'media';
+  const size = grav === 'critica' ? 42 : grav === 'alta' ? 36 : 30;
+
+  const icon = L.divIcon({
+    className: '',
+    html: `
+      <div class="custom-pin ${grav==='critica' ? 'pin-critical' : ''}" style="
+        width:${size}px; height:${size}px;
+        background:${cfg.color};
+        box-shadow: 0 0 ${grav==='critica'?'20px':'10px'} ${cfg.color}88;
+      ">
+        <span>${cfg.icon}</span>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size],
+    popupAnchor: [0, -size],
+  });
+
+  const marker = L.marker(pos, { icon });
+
+  const dt = oc.data ? `${oc.data} ${oc.hora || ''}` : 'Sem data';
+  marker.bindPopup(`
+    <div class="popup-content">
+      <div class="popup-type" style="color:${cfg.color}">${cfg.icon} ${cfg.label.toUpperCase()}</div>
+      <h4>${oc.local || 'Localização desconhecida'}</h4>
+      <div class="popup-meta">
+        ${oc.grupo ? `<strong>Grupo:</strong> ${oc.grupo}<br>` : ''}
+        <strong>Data/Hora:</strong> ${dt}<br>
+        ${oc.fonte ? `<strong>Fonte:</strong> ${oc.fonte}<br>` : ''}
+        ${!hasCoords ? `<strong>Localização:</strong> aproximada por zona<br>` : ''}
+        ${oc.descricao ? `<br>${oc.descricao}` : ''}
+      </div>
+    </div>
+  `);
+
+  marker._ocType = oc.tipo;
+  return marker;
+}
+
+function renderOcorrencias() {
+  pinGroup.clearLayers();
+  markers = [];
+
+  const listEl = document.getElementById('ocorrencias-list');
+  if (ocorrencias.length === 0) {
+    listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">
+      Nenhuma ocorrência registrada.<br>
+      <span style="font-size:11px;">Use + para adicionar ou importe uma planilha.</span>
+    </div>`;
+  } else {
+    listEl.innerHTML = '';
+  }
+
+  // Count per type
+  const counts = {};
+  ocorrencias.forEach(oc => { counts[oc.tipo] = (counts[oc.tipo]||0) + 1; });
+  Object.keys(TYPE_CONFIG).forEach(t => {
+    const el = document.getElementById(`cnt-${t}`);
+    if (el) el.textContent = counts[t] || 0;
+  });
+
+  document.getElementById('stat-total').textContent = ocorrencias.length;
+
+  const today = new Date().toLocaleDateString('pt-BR');
+  const todayCount = ocorrencias.filter(oc => {
+    if (!oc.data) return false;
+    const parts = oc.data.split('/');
+    const dt = parts.length === 3 ? `${parts[0]}/${parts[1]}/${parts[2]}` : oc.data;
+    return dt === today;
+  }).length;
+  document.getElementById('stat-hoje').textContent = todayCount;
+
+  // Sort by time desc
+  const sorted = [...ocorrencias].reverse();
+
+  sorted.forEach(oc => {
+    if (!activeFilters.has(oc.tipo)) return;
+
+    // Marker
+    if (layerVisible.pins && isTodayOc(oc)) {
+      const m = createPin(oc);
+      if (m) {
+        markers.push(m);
+        pinGroup.addLayer(m);
+      }
+    }
+
+    // Sidebar item
+    const cfg = TYPE_CONFIG[oc.tipo] || TYPE_CONFIG.outros;
+    const item = document.createElement('div');
+    item.className = 'oc-item';
+    item.innerHTML = `
+      <div class="oc-icon">${cfg.icon}</div>
+      <div class="oc-info">
+        <div class="oc-type" style="color:${cfg.color}">${cfg.label}</div>
+        <div class="oc-local">${oc.local || 'Local não informado'}</div>
+        ${oc.grupo ? `<div class="oc-local" style="color:#888">${oc.grupo}</div>` : ''}
+      </div>
+      <div class="oc-time">${oc.data || '--'}<br>${oc.hora || '--'}</div>
+    `;
+    item.onclick = () => {
+      const pos = getOcLatLng(oc);
+      if (pos) map.flyTo(pos, 15, { duration: 1 });
+      showOcorrenciaDetail(oc);
+    };
+    listEl.appendChild(item);
+  });
+}
+
+// ══════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════
+function openOcorrenciaModal(lat, lng) {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('open');
+
+  const now = new Date();
+  document.getElementById('f-data').value = now.toISOString().slice(0,10);
+  document.getElementById('f-hora').value = now.toTimeString().slice(0,5);
+
+  if (lat !== undefined) {
+    document.getElementById('f-lat').value = lat.toFixed(6);
+    document.getElementById('f-lng').value = lng.toFixed(6);
+  }
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+}
+
+function salvarOcorrencia() {
+  const tipo = document.getElementById('f-tipo').value;
+  const local = document.getElementById('f-local').value;
+  const lat = parseFloat(document.getElementById('f-lat').value);
+  const lng = parseFloat(document.getElementById('f-lng').value);
+
+  if (!tipo || !local) {
+    showNotif('⚠️ Preencha Tipo e Localidade', 3000, '#ffd700');
+    return;
+  }
+
+  const oc = {
+    id: Date.now(),
+    tipo,
+    local,
+    lat: isNaN(lat) ? null : lat,
+    lng: isNaN(lng) ? null : lng,
+    data: document.getElementById('f-data').value,
+    hora: document.getElementById('f-hora').value,
+    grupo: document.getElementById('f-grupo').value,
+    descricao: document.getElementById('f-descricao').value,
+    fonte: document.getElementById('f-fonte').value,
+    gravidade: document.getElementById('f-gravidade').value,
+  };
+
+  // Format date to dd/mm/yyyy for display
+  if (oc.data) {
+    const p = oc.data.split('-');
+    if (p.length === 3) oc.data = `${p[2]}/${p[1]}/${p[0]}`;
+  }
+
+  ocorrencias.push(oc);
+  renderOcorrencias();
+  closeModal();
+
+  // Save to localStorage as backup
+  try { localStorage.setItem('cicc_ocorrencias', JSON.stringify(ocorrencias)); } catch(e){}
+
+  const cfg = TYPE_CONFIG[tipo];
+  showNotif(`${cfg.icon} ${cfg.label} registrado em ${local}`);
+
+  if (oc.lat && oc.lng) {
+    map.flyTo([oc.lat, oc.lng], 15, { duration: 1.5 });
+  }
+
+  // Reset form
+  ['f-tipo','f-local','f-lat','f-lng','f-grupo','f-descricao','f-fonte'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-gravidade').value = 'media';
+}
+
+// ══════════════════════════════════════════
+//  DETAIL PANELS
+// ══════════════════════════════════════════
+function showRegionDetail(region) {
+  const panel = document.getElementById('detail-panel');
+  const inner = document.getElementById('detail-inner');
+  const cfg = CPA_COLORS[region.cpa] || '#607d8b';
+
+  const ocs = ocorrencias.filter(oc =>
+    oc.local && oc.local.toUpperCase().includes(region.name.toUpperCase().slice(0,8))
+  );
+
+  inner.innerHTML = `
+    <h2 style="color:${cfg}; font-size:16px; margin-bottom:4px;">${region.name}</h2>
+    <span class="detail-tag" style="color:${cfg}; margin-bottom:12px;">${region.cpa || ''}</span>
+    <div class="detail-row"><span class="key">BPM</span><span class="value">${region.bpm || '—'}</span></div>
+    <div class="detail-row"><span class="key">UPP</span><span class="value" style="font-size:11px;">${region.upp || '—'}</span></div>
+    <div class="detail-row"><span class="key">Ocorrências (local)</span><span class="value" style="color:var(--accent)">${ocs.length}</span></div>
+    <div style="margin-top:16px; font-family:var(--font-ui); font-size:11px; color:var(--muted); letter-spacing:1px; text-transform:uppercase;">Atividade Recente</div>
+    ${ocs.length === 0 
+      ? '<div style="font-size:12px; color:var(--muted); margin-top:8px;">Sem ocorrências registradas para esta área.</div>'
+      : ocs.slice(-3).map(oc => {
+          const c = TYPE_CONFIG[oc.tipo] || TYPE_CONFIG.outros;
+          return `<div style="margin-top:8px; font-size:12px; display:flex; gap:8px; align-items:center;">
+            <span>${c.icon}</span>
+            <div><div style="color:${c.color}; font-weight:600;">${c.label}</div>
+            <div style="color:var(--muted);">${oc.data} ${oc.hora}</div></div>
+          </div>`;
+        }).join('')
+    }
+  `;
+
+  panel.classList.add('open');
+}
+
+function showOcorrenciaDetail(oc) {
+  const panel = document.getElementById('detail-panel');
+  const inner = document.getElementById('detail-inner');
+  const cfg = TYPE_CONFIG[oc.tipo] || TYPE_CONFIG.outros;
+  const pos = getOcLatLng(oc);
+  const hasCoords = !!(oc.lat && oc.lng);
+
+  inner.innerHTML = `
+    <div style="font-size:28px; margin-bottom:8px;">${cfg.icon}</div>
+    <h2 style="color:${cfg.color};">${cfg.label}</h2>
+    <span class="detail-tag" style="color:${cfg.color}; margin-bottom:12px;">${(oc.gravidade||'media').toUpperCase()}</span>
+
+    <div class="detail-row"><span class="key">Local</span><span class="value">${oc.local||'—'}</span></div>
+    <div class="detail-row"><span class="key">Data</span><span class="value">${oc.data||'—'}</span></div>
+    <div class="detail-row"><span class="key">Hora</span><span class="value">${oc.hora||'—'}</span></div>
+    <div class="detail-row"><span class="key">Grupo/Facção</span><span class="value">${oc.grupo||'—'}</span></div>
+    <div class="detail-row"><span class="key">Fonte</span><span class="value">${oc.fonte||'—'}</span></div>
+    <div class="detail-row"><span class="key">Coordenadas</span><span class="value" style="font-family:var(--font-mono); font-size:11px;">${pos ? `${pos[0].toFixed(4)}, ${pos[1].toFixed(4)}${hasCoords ? '' : ' (aprox.)'}` : '—'}</span></div>
+    ${oc.descricao ? `<div style="margin-top:12px; font-size:13px; line-height:1.6; color:var(--text);">${oc.descricao}</div>` : ''}
+  `;
+
+  panel.classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+//  FILTERS & LAYERS
+// ══════════════════════════════════════════
+function toggleFilter(el) {
+  const type = el.dataset.type;
+  if (activeFilters.has(type)) {
+    activeFilters.delete(type);
+    el.classList.remove('active');
+  } else {
+    activeFilters.add(type);
+    el.classList.add('active');
+  }
+  renderOcorrencias();
+}
+
+function toggleLayer(name, rowEl) {
+  const toggleEl = document.getElementById(`toggle-${name}`);
+  layerVisible[name] = !layerVisible[name];
+  toggleEl.classList.toggle('on', layerVisible[name]);
+
+  if (name === 'regioes') {
+    if (layerVisible[name]) {
+      regionLayers.forEach(l => regionGroup.addLayer(l));
+    } else {
+      regionGroup.clearLayers();
+    }
+  }
+
+  if (name === 'pins') {
+    renderOcorrencias();
+  }
+}
+
+// ══════════════════════════════════════════
+//  MAP CLICK → PICK LOCATION
+// ══════════════════════════════════════════
+map.on('click', function(e) {
+  const modalOpen = document.getElementById('modal-overlay').classList.contains('open');
+  if (modalOpen) {
+    document.getElementById('f-lat').value = e.latlng.lat.toFixed(6);
+    document.getElementById('f-lng').value = e.latlng.lng.toFixed(6);
+    showNotif(`📍 Localização definida: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`, 2000);
+  }
+});
+
+// ══════════════════════════════════════════
+//  MAP VIEWS
+// ══════════════════════════════════════════
+const VIEWS = {
+  default: { center: [-22.9068, -43.1729], zoom: 11 },
+  norte:   { center: [-22.855, -43.310],   zoom: 12 },
+  sul:     { center: [-22.970, -43.190],   zoom: 12 },
+  oeste:   { center: [-22.920, -43.450],   zoom: 11 },
+};
+
+function setView(name) {
+  const v = VIEWS[name];
+  map.flyTo(v.center, v.zoom, { duration: 1.2 });
+  document.querySelectorAll('.map-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// ══════════════════════════════════════════
+//  IMPORT SPREADSHEET
+// ══════════════════════════════════════════
+function openImportModal() {
+  document.getElementById('import-overlay').style.display = 'flex';
+}
+
+function closeImportModal(e) {
+  if (!e || e.target === document.getElementById('import-overlay')) {
+    document.getElementById('import-overlay').style.display = 'none';
+  }
+}
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-area').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+
+function handleFileInput(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.csv') || name.endsWith('.tsv')) {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        importRows(results.data);
+        closeImportModal();
+      }
+    });
+  } else {
+    showNotif('⚠️ Por enquanto, use CSV. Suporte XLSX em breve.', 4000, '#ffd700');
+  }
+}
+
+function importRows(rows) {
+  let imported = 0;
+  rows.forEach(row => {
+    const sheetMapped = mapRowFromSheet(row);
+    if (sheetMapped) {
+      sheetMapped.id = Date.now() + imported;
+      ocorrencias.push(sheetMapped);
+      imported++;
+      return;
+    }
+    const tipo = normalizeTipo(row.tipo || row.Tipo || row.TIPO || '');
+    const lat = parseFloat(row.latitude || row.Latitude || row.lat || row.LAT || '');
+    const lng = parseFloat(row.longitude || row.Longitude || row.lng || row.LNG || '');
+
+    if (!tipo) return;
+
+    ocorrencias.push({
+      id: Date.now() + imported,
+      tipo,
+      local: row.local || row.Local || row.LOCAL || '',
+      lat: isNaN(lat) ? null : lat,
+      lng: isNaN(lng) ? null : lng,
+      data: row.data || row.Data || '',
+      hora: row.hora || row.Hora || '',
+      grupo: row.grupo || row.Grupo || row.faccao || '',
+      descricao: row.descricao || row.Descricao || row.obs || '',
+      fonte: row.fonte || row.Fonte || 'Planilha',
+      gravidade: normalizaGravidade(row.gravidade || ''),
+    });
+    imported++;
+  });
+
+  renderOcorrencias();
+  showNotif(`✅ ${imported} ocorrências importadas da planilha`);
+
+  try { localStorage.setItem('cicc_ocorrencias', JSON.stringify(ocorrencias)); } catch(e){}
+}
+
+function normalizeTipo(str) {
+  const s = str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (s.includes('tiro') || s.includes('bala') || s.includes('conflito')) return 'tiroteio';
+  if (s.includes('assalto') || s.includes('roubo')) return 'assalto';
+  if (s.includes('operacao') || s.includes('policial') || s.includes('policia')) return 'operacao';
+  if (s.includes('trafico') || s.includes('droga') || s.includes('entorpecente')) return 'trafico';
+  if (s.includes('homicidio') || s.includes('morte') || s.includes('assassinato')) return 'homicidio';
+  if (s.includes('sequestro') || s.includes('carcere') || s.includes('rapto')) return 'sequestro';
+  if (s.length > 0) return 'outros';
+  return '';
+}
+
+function normalizaGravidade(str) {
+  const s = str.toLowerCase();
+  if (s.includes('critica') || s.includes('crítica') || s === '4') return 'critica';
+  if (s.includes('alta') || s === '3') return 'alta';
+  if (s.includes('baixa') || s === '1') return 'baixa';
+  return 'media';
+}
+
+function normalizeZone(str) {
+  const s = String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (s.includes('zona norte') || s.includes('norte')) return 'norte';
+  if (s.includes('zona sul') || s.includes('sul')) return 'sul';
+  if (s.includes('zona oeste') || s.includes('oeste')) return 'oeste';
+  if (s.includes('centro')) return 'centro';
+  if (s.includes('baixada')) return 'baixada';
+  if (s.includes('niteroi') || s.includes('niterói')) return 'niteroi';
+  return 'default';
+}
+
+const ZONE_CENTERS = {
+  norte:   [-22.855, -43.310],
+  sul:     [-22.970, -43.190],
+  oeste:   [-22.920, -43.450],
+  centro:  [-22.905, -43.180],
+  baixada: [-22.750, -43.360],
+  niteroi: [-22.880, -43.100],
+  default: [-22.9068, -43.1729],
+};
+
+function hashCode(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
+}
+
+function jitterLatLng(base, seed) {
+  const h = hashCode(seed);
+  const r1 = ((h & 0xffff) / 0xffff) * 2 - 1;
+  const r2 = (((h >> 16) & 0xffff) / 0xffff) * 2 - 1;
+  const lat = base[0] + r1 * 0.015;
+  const lng = base[1] + r2 * 0.02;
+  return [lat, lng];
+}
+
+function getOcLatLng(oc) {
+  if (oc.lat && oc.lng) return [oc.lat, oc.lng];
+  const zoneKey = normalizeZone(oc.zona || oc.grupo || '');
+  const base = ZONE_CENTERS[zoneKey] || ZONE_CENTERS.default;
+  const seed = `${oc.local || ''}|${oc.data || ''}|${oc.tipo || ''}|${oc.fonte || ''}`;
+  return jitterLatLng(base, seed);
+}
+
+function normalizeDateToPt(dateStr) {
+  const s = String(dateStr || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return s;
+}
+
+function isTodayOc(oc) {
+  const today = new Date().toLocaleDateString('pt-BR');
+  const d = normalizeDateToPt(oc.data || '');
+  return d === today;
+}
+
+function normalizeHeaderKey(k) {
+  return String(k || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getField(row, keys) {
+  const map = {};
+  Object.keys(row || {}).forEach(k => { map[normalizeHeaderKey(k)] = row[k]; });
+  for (const k of keys) {
+    const v = map[normalizeHeaderKey(k)];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+function mapRowFromSheet(row) {
+  const categoria = getField(row, ['categoria']);
+  const titulo = getField(row, ['titulo', 'título']);
+  if (!categoria && !titulo) return null;
+
+  const data = getField(row, ['data', '05']);
+  const bairro = getField(row, ['bairro']);
+  const municipio = getField(row, ['municipio', 'município']);
+  const regiao = getField(row, ['regiao - zona', 'regiao', 'região - zona', 'região']);
+  const fonte = getField(row, ['fonte']);
+  const link = getField(row, ['link']);
+  const operador = getField(row, ['operador']);
+
+  const tipo = normalizeTipo(categoria);
+  if (!tipo) return null;
+
+  const local = bairro ? (municipio ? `${bairro} - ${municipio}` : bairro) : (municipio || '');
+  const descricao = [titulo, link].filter(Boolean).join(' · ');
+
+  return {
+    tipo,
+    local,
+    lat: null,
+    lng: null,
+    data,
+    hora: '',
+    grupo: regiao,
+    zona: regiao,
+    descricao,
+    fonte: fonte || operador || 'Sheets',
+    gravidade: 'media',
+    _source: 'sheets',
+  };
+}
+
+function setOcorrenciasFromSheet(rows) {
+  const mapped = [];
+  rows.forEach((row, i) => {
+    const oc = mapRowFromSheet(row);
+    if (!oc) return;
+    oc.id = Date.now() + i;
+    mapped.push(oc);
+  });
+  ocorrencias = mapped;
+  renderOcorrencias();
+}
+
+async function loadSheetData() {
+  try {
+    if (location.protocol === 'file:') {
+      showNotif('⚠️ Abra via servidor local para carregar dados externos/CSV.', 5000, '#ffd700');
+      return;
+    }
+
+    if (SHEETS_CONFIG.apiKey && SHEETS_CONFIG.sheetId) {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.sheetId}/values/${encodeURIComponent(SHEETS_CONFIG.range)}?key=${SHEETS_CONFIG.apiKey}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.values || json.values.length < 2) {
+        showNotif('⚠️ Planilha vazia ou range inválido.', 4000, '#ffd700');
+        return;
+      }
+      const [headers, ...rows] = json.values;
+      const objs = rows.map(r => {
+        const o = {};
+        headers.forEach((h, idx) => { o[h] = r[idx] ?? ''; });
+        return o;
+      });
+      setOcorrenciasFromSheet(objs);
+      showNotif(`✅ ${objs.length} ocorrências carregadas da Sheets API`);
+      return;
+    }
+
+    if (SHEETS_CONFIG.csvUrl) {
+      const res = await fetch(SHEETS_CONFIG.csvUrl);
+      if (!res.ok) throw new Error('CSV fetch failed');
+      const text = await res.text();
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          setOcorrenciasFromSheet(results.data || []);
+          showNotif(`✅ ${results.data.length} ocorrências carregadas do CSV`);
+        }
+      });
+    }
+  } catch (e) {
+    showNotif('⚠️ Falha ao carregar dados da planilha.', 4000, '#ffd700');
+  }
+}
+
+// ══════════════════════════════════════════
+//  SUPABASE CONNECTION INFO
+// ══════════════════════════════════════════
+function connectSupabase() {
+  alert(`Para integrar com o Supabase:
+
+1. Crie um projeto em supabase.com
+2. Execute o SQL de setup (arquivo supabase_schema.sql)
+3. Adicione sua SUPABASE_URL e SUPABASE_KEY no arquivo config.js
+4. Descomente o bloco de integração no código
+
+Tabelas necessárias:
+- ocorrencias (id, tipo, local, lat, lng, data, hora, grupo, descricao, fonte, gravidade, created_at)
+- regioes (id, name, cpa, bpm, upp)
+- grupos_criminosos (id, nome, cor, descricao)`);
+}
+
+// ══════════════════════════════════════════
+//  NOTIFICATIONS
+// ══════════════════════════════════════════
+function showNotif(msg, duration = 3000, color = null) {
+  const container = document.getElementById('notif-container');
+  const div = document.createElement('div');
+  div.className = 'notif';
+  if (color) div.style.borderLeftColor = color;
+  div.textContent = msg;
+  container.appendChild(div);
+  setTimeout(() => div.remove(), duration);
+}
+
+// ══════════════════════════════════════════
+//  CLOCK
+// ══════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
+  document.getElementById('today-date').textContent =
+    now.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' }).toUpperCase();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ══════════════════════════════════════════
+//  PERSIST / RESTORE
+// ══════════════════════════════════════════
+function restoreData() {
+  try {
+    const saved = localStorage.getItem('cicc_ocorrencias');
+    if (saved) {
+      ocorrencias = JSON.parse(saved);
+      renderOcorrencias();
+      if (ocorrencias.length > 0) {
+        showNotif(`📂 ${ocorrencias.length} ocorrências restauradas do cache local`);
+      }
+    }
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+initRegions();
+const sheetsEnabled = (SHEETS_CONFIG.apiKey && SHEETS_CONFIG.sheetId) || SHEETS_CONFIG.csvUrl;
+if (sheetsEnabled) {
+  loadSheetData();
+  if (SHEETS_CONFIG.refreshMs > 0) {
+    setInterval(loadSheetData, SHEETS_CONFIG.refreshMs);
+  }
+} else {
+  restoreData();
+}
+
+// Demo data for preview if empty
+setTimeout(() => {
+  if (!sheetsEnabled && ocorrencias.length === 0) {
+    const demos = [
+      { tipo:'tiroteio',  local:'Complexo do Alemão',  lat:-22.855, lng:-43.271, data:'10/03/2025', hora:'14:30', grupo:'CV',       gravidade:'alta',   fonte:'Rádio', descricao:'Confronto entre facções.' },
+      { tipo:'operacao',  local:'Rocinha',             lat:-22.990, lng:-43.248, data:'10/03/2025', hora:'08:00', grupo:'',          gravidade:'media',  fonte:'CICC',  descricao:'Operação integrada.' },
+      { tipo:'assalto',   local:'Jacarezinho',         lat:-22.893, lng:-43.263, data:'09/03/2025', hora:'22:15', grupo:'CV',        gravidade:'media',  fonte:'190',   descricao:'' },
+      { tipo:'trafico',   local:'Manguinhos',          lat:-22.879, lng:-43.249, data:'09/03/2025', hora:'16:00', grupo:'CV',        gravidade:'baixa',  fonte:'Informante', descricao:'' },
+      { tipo:'homicidio', local:'Vila Cruzeiro',       lat:-22.844, lng:-43.254, data:'08/03/2025', hora:'03:20', grupo:'CV',        gravidade:'critica',fonte:'IML',   descricao:'Corpo encontrado.' },
+    ];
+    demos.forEach((d,i) => { d.id = i+1; ocorrencias.push(d); });
+    renderOcorrencias();
+    showNotif('📊 Dados de demonstração carregados');
+  }
+}, 500);
+</script>
+
+</body>
+</html>
